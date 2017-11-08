@@ -2,25 +2,21 @@
 var path = require('path'),
     https = require('https'),
     Twit = require('twit'),
-    config = {
-				/* Make sure you set the appropriate environment variables
-					 with your API keys.
-					 See how to get them: https://botwiki.org/tutorials/how-to-create-a-twitter-app */      
-      twitter: {
-        consumer_key: process.env.CONSUMER_KEY,
-        consumer_secret: process.env.CONSUMER_SECRET,
-        access_token: process.env.ACCESS_TOKEN,
-        access_token_secret: process.env.ACCESS_TOKEN_SECRET
-      }
-    },
-    T = new Twit(require('./config.js'));
+    T = new Twit(require('./config.js')),
+		fs = require('fs');
 
+var minutes = 60 // default to tweeting once an hour
+if (process.argv.length > 2) {
+	minutes = process.argv[2];
+}
+
+var PIDFILE = ".pid";
 
 function sendTweet(tweet) {
   console.log("Will send tweet '" + tweet + "'");
   T.post('statuses/update', { status: tweet }, function(err, data, res) {
     if (err){
-      console.log('Error: ' + err);
+      console.log(err.message);
     }
     else {
   		console.log('Sent');
@@ -29,7 +25,7 @@ function sendTweet(tweet) {
 }
 
 function generatePhrase(rhymeWord) {
-  console.log("Ryhmeable word is " + rhymeWord);
+  // console.log("Ryhmeable word is " + rhymeWord);
   let wordrequest = https.get("https://api.datamuse.com/words?rel_jjb=" + rhymeWord,
           wordresponse => {
             let body= "";
@@ -43,7 +39,7 @@ function generatePhrase(rhymeWord) {
                           phrase = "I got nothing, sorry.";
                         } else {
                           let i = Math.floor(Math.random()*info.length);
-                          phrase = info[i].word + " " + "hop";
+                          phrase = info[i].word + " " + rhymeWord + " hop";
                         }
                         sendTweet(phrase);
                   });
@@ -62,12 +58,24 @@ function generate() {
                             return (item.numSyllables == 1 && item.score > 500);
                           });
                           let i = Math.floor(Math.random()*info.length);
-                          generatePhrase(info[i].word, response);
+                          generatePhrase(info[i].word);
                       });
           });
 }
 
-console.dir(config);
+var pid = process.pid
+console.log("Bot launching, tweet frequency = once per " + minutes + " minutes");
+console.log("PID is " + pid);
+
+fs.writeFile(PIDFILE, pid + "\n", function(err) { 
+	if (err)	
+		console.log("Problem saving PID to file: " + err);
+});
 
 generate();
+setInterval(function() {
+		generate();
+	}, minutes*60*1000);
+
+// generate();
 
